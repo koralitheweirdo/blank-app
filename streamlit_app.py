@@ -7,6 +7,7 @@ from langchain.embeddings import HuggingFaceEmbeddings  # type: ignore
 from langchain.vectorstores import FAISS  # type: ignore
 from langchain.chains import RetrievalQA  # type: ignore
 from langchain.chat_models import ChatOpenAI  # type: ignore
+from langchain.prompts import ChatPromptTemplate  # type: ignore
 
 # Load API key
 load_dotenv()
@@ -23,24 +24,13 @@ def get_llm():
 # 🌟 Streamlit UI
 st.set_page_config(page_title="MarketConfusion - FinanceBot", page_icon="💼")
 
+# 🎀 CSS
 st.markdown("""
     <style>
     .stApp { background-color: #e8f5ff; }
-    h1, h2, h3, .stTitle, .stSubtitle {
-        color: #00034f !important;
-        font-family: 'Poppins', sans-serif !important;
-    }
-    input {
-        background-color: #ffffff !important;
-        color: #4e4b56 !important;
-        border: 2px solid #f48fb1 !important;
-        border-radius: 8px !important;
-    }
-    button {
-        background-color: #b0ffbc !important;
-        color: white !important;
-        border-radius: 12px !important;
-    }
+    h1, h2, h3, .stTitle, .stSubtitle { color: #00034f !important; font-family: 'Poppins', sans-serif !important; }
+    input { background-color: #ffffff !important; color: #4e4b56 !important; border: 2px solid #f48fb1 !important; border-radius: 8px !important; }
+    button { background-color: #b0ffbc !important; color: white !important; border-radius: 12px !important; }
     .stTitle { text-align: center; }
     </style>
 """, unsafe_allow_html=True)
@@ -48,34 +38,19 @@ st.markdown("""
 # 🎀 Header
 st.title("MarketConfusion")
 st.subheader("💼 Your Financial teacher on the go!")
-st.write("💬 Meet **FinanceBot** 🤖, your personal financial assistant! Ready to help you navigate the world of finance. Just ask a question and get smart answers!")
+st.write("💬 Meet **FinanceBot** 🤖, your personal financial assistant! Just ask a question and get smart answers!")
 st.image("https://chatgpt.com/backend-api/public_content/enc/eyJpZCI6Im1fNjgwYmY5ZWNjZWZjODE5MTk3OTUwYjhlZGU0NDAxZTU6ZmlsZV8wMDAwMDAwMDQ3Njg2MWY2ODk3NTk1OTM3NGFlMDUwMiIsInRzIjoiNDg0ODkzIiwicCI6InB5aSIsInNpZyI6ImZlNmE2MmVhNGU3NTFkZjZjNmQ2ZjE4NzIwM2M2YjAzYWRjZjhmZTNhMzIwMzg5ZDI0NGFmNDU0NjM3ZDM5MWYiLCJ2IjoiMCIsImdpem1vX2lkIjpudWxsfQ==", width=300)
 st.write("Hi, what can I do for you today? 😊")
 
-# 📄 Step 1: Load and index content
-st.subheader("Step 1: Load Content")
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
+# 📄 Load documents and create vectorstore
 urls = [
     "https://www.bankofcanada.ca/2025/03/price-check-inflation-in-canada/",
     "https://www.investopedia.com/articles/basics/11/3-s-simple-investing.asp",
-    "https://www.investopedia.com/articles/basics/06/invest1000.asp",
-    "https://www.investopedia.com/ask/answers/08/trading-frequency-commissions.asp",
-    "https://www.investopedia.com/articles/bonds/08/bond-market-basics.asp",
-    "https://www.investopedia.com/articles/fundamental/03/022603.asp",
-    "https://www.investopedia.com/articles/personal-finance/100516/setting-financial-goals/",
-    "https://www.investopedia.com/top-10-personal-finance-podcasts-5088034",
-    "https://www.investopedia.com/personal-finance/most-common-financial-mistakes/",
-    "https://www.investopedia.com/personal-finance-calendar-5092591",
-    "https://www.investopedia.com/articles/pf/09/financial-responsibility.asp",
-    "https://www.investopedia.com/terms/t/tariff.asp",
-    "https://www.investopedia.com/terms/c/capitalism.asp",
-    "https://www.canada.ca/en/department-finance/programs/international-trade-finance-policy/canadas-response-us-tariffs.html",
-    "https://www.canada.ca/en/public-health/services/suicide-prevention.html",
-    "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
-    "https://www.canada.ca/en/financial-consumer-agency/services/covid-19-managing-financial-health.html",
-    "https://www.canada.ca/en/revenue-agency/services/tax/individuals/topics/first-home-savings-account/opening-your-fhsas.html",
-    "https://www.edc.ca/en/article/how-tariffs-work-for-business.html",
-    "https://www.edc.ca/en/campaign/trade-support-canadian-companies.html"
+    # (your other URLs)
 ]
 
 if st.button("🔍 Load and Index Content"):
@@ -92,28 +67,46 @@ if st.button("🔍 Load and Index Content"):
 
     st.success("✅ Documents Loaded and Indexed!")
 
-
-
-# 🧠 Step 2: Ask a question
+# 🧠 Load vectorstore ONCE
+if os.path.exists("finance_vectorstore"):
+    embeddings = HuggingFaceEmbeddings()
+    vectorstore = FAISS.load_local("finance_vectorstore", embeddings, allow_dangerous_deserialization=True)
+    retriever = vectorstore.as_retriever()
+    qa = RetrievalQA.from_chain_type(
+        llm=get_llm(),
+        retriever=retriever,
+    )
+custom_prompt=ChatPromptTemplate(
+    input_variables=["context", "question"],
+    messages=[
+        {
+            "role": "user",
+            "content": """You are a super friendly and helpful financial assistant named FinanceBot.
+Answer the following question based on the provided context.
+Be warm, encouraging, and easy to understand.
+context={context}
+question={question}
+Answer:"""
+        }
+    ],
+)
+return_messages=True,
+# 🧠 Step 2: Ask a Question
 st.subheader("Step 2: Ask a Question")
 
-question = st.text_input("Ask me something based on the documents 💬")
+with st.form("chat_form"):
+    question = st.text_input("What do you want to know? (e.g. What is a tariff?)")
+    submitted = st.form_submit_button("🧠 Get Answer")
 
-if st.button("🧠 Get Answer") and question:
-    with st.spinner("Loading knowledge base..."):
-        embeddings = HuggingFaceEmbeddings()
-        vectorstore = FAISS.load_local("finance_vectorstore", embeddings, allow_dangerous_deserialization=True)
-        retriever = vectorstore.as_retriever()
-
-        qa = RetrievalQA.from_chain_type(
-            llm=get_llm(),
-            retriever=retriever,
-        )
-
+if submitted and question:
+    st.session_state.messages.append({"role": "user", "content": question})
     with st.spinner("Thinking... 💭"):
         answer = qa.run(question)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
 
-    st.markdown(f"**Answer:** {answer}")
-
-   
-
+# 💬 Display chat history
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f"**You:** {msg['content']}")
+    else:
+        st.markdown(f"**FinanceBot:** {msg['content']}")
