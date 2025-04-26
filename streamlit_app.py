@@ -133,9 +133,9 @@ st.subheader("Step 3: Take a Quiz")
 st.write("Test your knowledge with a quiz! 📝")
 
 
-if st.button(Quiz):
+if st.button("Quiz"):
     with st.spinner("Loading quiz..."):
-    st.session_state.page = 'quiz'
+        st.session_state.page = 'quiz'
 if st.session_state.page == 'quiz':
     # Dynamically import quiz module and run it
     quiz = importlib.import_module('quiz')
