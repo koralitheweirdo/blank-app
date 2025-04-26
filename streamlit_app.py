@@ -121,3 +121,22 @@ if st.button("🧠 Get Answer") and question:
         answer = qa.run(question)
         st.markdown(f"**Answer:** {answer}")
 
+import streamlit as st
+import importlib
+
+# Set default state if not already set
+if 'page' not in st.session_state:
+    st.session_state.page = 'quiz'
+
+# Buttons to navigate between pages
+st.subheader("Step 3: Take a Quiz")
+st.write("Test your knowledge with a quiz! 📝")
+
+
+if st.button(Quiz):
+    with st.spinner("Loading quiz..."):
+    st.session_state.page = 'quiz'
+if st.session_state.page == 'quiz':
+    # Dynamically import quiz module and run it
+    quiz = importlib.import_module('quiz')
+    quiz.start_quiz()
